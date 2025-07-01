@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Malaria AI Dashboard</title>
+    <link rel="stylesheet" href="src/dashboard.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <h1>Malaria AI Dashboard</h1>
+            <button id="logout-btn" class="logout-btn">Logout</button>
+        </header>
+        <main class="dashboard-content">
+            <div class="welcome-message">
+                <p id="welcome-text">Loading welcome message...</p>
+            </div>
+            <div class="map-container" id="malaria-map"></div>
+            <div class="charts-container">
+                <div class="chart-box">
+                    <canvas id="regionPieChart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <canvas id="regionBarChart"></canvas>
+                </div>
+            </div>
+            <div class="prediction-container">
+                <h3>Malaria Trend Prediction</h3>
+                <div class="prediction-controls" style="margin-bottom: 1rem;">
+                    <button id="predict-btn">Generate Prediction</button>
+                    <select id="prediction-region">
+                        <option value="global">Global</option>
+                        <option value="africa">Africa</option>
+                        <option value="asia">Asia</option>
+                        <option value="americas">Americas</option>
+                    </select>
+                </div>
+                <div class="prediction-result" id="prediction-result"></div>
+                <canvas id="predictionChart" style="margin-top: 20px;"></canvas>
+            </div>
+            </div>
+            <div class="panel">
+                <h3>AI Chat Assistant</h3>
+                <div id="chat-container"></div>
+                <div class="chat-input-container">
+                    <input type="text" id="chat-input" placeholder="Ask about malaria...">
+                    <button id="send-chat-btn">
+                        <i class="fas fa-paper-plane"></i>
+                        Send
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+    <style>
+        /* Enhanced Global Styles */
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .dashboard-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            margin: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .dashboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .dashboard-header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #fff, #f0f8ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .logout-btn {
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+        
+        .dashboard-content {
+            padding: 2rem;
+        }
+        
+        .welcome-message {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .welcome-message p {
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin: 0;
+        }
+        
+        /* Enhanced Map Container */
+        .map-container {
+            background: white;
+            border-radius: 20px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            margin: 2rem 0;
+            border: 1px solid rgba(102, 126, 234, 0.1);
+            transition: all 0.3s ease;
+            width: 100%;
+            min-height: 500px;
+            height: 60vh;
+        }
+        
+        .map-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+        
+        /* Enhanced Charts Container */
+        .charts-container {
+            display: flex;
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .chart-box {
+            flex: 1;
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .chart-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .chart-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+        
+        /* Enhanced Prediction Container */
+        .prediction-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            margin: 2rem 0;
+            border: 1px solid rgba(102, 126, 234, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .prediction-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .prediction-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+        
+        .prediction-container h3 {
+            color: #2c3e50;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            margin-top: 0;
+        }
+        
+        /* Enhanced Buttons */
+        #predict-btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        #predict-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        #prediction-region {
+            padding: 12px 16px;
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            border-radius: 12px;
+            background: white;
+            color: #2c3e50;
+            font-weight: 500;
+            margin-left: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        #prediction-region:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .prediction-result {
+            background: rgba(102, 126, 234, 0.05);
+            border: 2px dashed rgba(102, 126, 234, 0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-height: 100px;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        
+        /* Enhanced Chat Panel */
+        .panel {
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            margin: 2rem 0;
+            border: 1px solid rgba(102, 126, 234, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .panel:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+        
+        .panel h3 {
+            color: #2c3e50;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            margin-top: 0;
+        }
+        
+        #chat-container {
+            height: 350px;
+            overflow-y: auto;
+            margin-bottom: 1.5rem;
+            border: 2px solid rgba(102, 126, 234, 0.1);
+            padding: 1.5rem;
+            border-radius: 16px;
+            background: rgba(102, 126, 234, 0.02);
+            backdrop-filter: blur(10px);
+        }
+        
+        #chat-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        #chat-container::-webkit-scrollbar-track {
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 4px;
+        }
+        
+        #chat-container::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+        }
+        
+        .chat-input-container {
+            display: flex;
+            gap: 0;
+            border-radius: 50px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+        }
+        
+        #chat-input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            border-right: none;
+            background: white;
+            color: #2c3e50;
+            font-size: 1rem;
+            font-weight: 500;
+            border-radius: 50px 0 0 50px;
+            transition: all 0.3s ease;
+        }
+        
+        #chat-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        #send-chat-btn {
+            padding: 15px 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 0 50px 50px 0;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        #send-chat-btn:hover {
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+            transform: translateX(2px);
+        }
+        
+        /* Enhanced Chat Messages */
+        .chat-message {
+            margin-bottom: 15px;
+            padding: 12px 18px;
+            border-radius: 20px;
+            max-width: 80%;
+            font-weight: 500;
+            line-height: 1.5;
+            animation: fadeInUp 0.3s ease;
+        }
+        
+        .user-message {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 8px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .ai-message {
+            background: rgba(102, 126, 234, 0.1);
+            color: #2c3e50;
+            margin-right: auto;
+            border-bottom-left-radius: 8px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+        }
+        
+        .loading {
+            color: #667eea;
+            font-style: italic;
+            animation: pulse 1.5s infinite;
+        }
+        
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .dashboard-container {
+                margin: 10px;
+            }
+            
+            .dashboard-header {
+                padding: 1.5rem;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .dashboard-header h1 {
+                font-size: 2rem;
+            }
+            
+            .charts-container {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .dashboard-content {
+                padding: 1rem;
+            }
+        }
+    </style>
+    <script src="src/main.tsx"></script>
+    <script>
+        // Initialize chat functionality
+        const chatContainer = document.getElementById('chat-container');
+        const chatInput = document.getElementById('chat-input');
+        const sendChatBtn = document.getElementById('send-chat-btn');
+
+        function addMessage(message, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${isUser ? 'user-message' : 'ai-message'}`;
+            messageDiv.textContent = message;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Mock AI responses for malaria-related questions
+        const malariaKnowledgeBase = {
+            'symptoms': 'Common malaria symptoms include fever, chills, headache, muscle aches, fatigue, nausea, and vomiting. Symptoms typically appear 10-15 days after being bitten by an infected mosquito.',
+            'prevention': 'Malaria prevention includes using insecticide-treated bed nets, indoor residual spraying, antimalarial medications for travelers, and eliminating mosquito breeding sites.',
+            'treatment': 'Malaria treatment depends on the type and severity. Common treatments include artemisinin-based combination therapies (ACTs), chloroquine (for sensitive strains), and severe malaria may require hospitalization.',
+            'transmission': 'Malaria is transmitted through bites from infected female Anopheles mosquitoes. It cannot spread directly from person to person.',
+            'statistics': 'According to WHO, there were approximately 247 million malaria cases and 619,000 deaths in 2021, with Africa bearing the highest burden.',
+            'regions': 'Malaria is endemic in tropical and subtropical regions, particularly sub-Saharan Africa, parts of Asia, and some areas of Latin America.',
+            'types': 'There are five species of malaria parasites: P. falciparum (most deadly), P. vivax, P. ovale, P. malariae, and P. knowlesi.',
+            'diagnosis': 'Malaria is diagnosed through blood tests including rapid diagnostic tests (RDTs) and microscopic examination of blood smears.'
+        };
+
+        function findBestMatch(userMessage) {
+            const message = userMessage.toLowerCase();
+            
+            // Check for keywords and return appropriate responses
+            if (message.includes('symptom') || message.includes('sign') || message.includes('feel')) {
+                return malariaKnowledgeBase.symptoms;
+            } else if (message.includes('prevent') || message.includes('avoid') || message.includes('protect')) {
+                return malariaKnowledgeBase.prevention;
+            } else if (message.includes('treat') || message.includes('cure') || message.includes('medicine') || message.includes('drug')) {
+                return malariaKnowledgeBase.treatment;
+            } else if (message.includes('transmit') || message.includes('spread') || message.includes('catch') || message.includes('get')) {
+                return malariaKnowledgeBase.transmission;
+            } else if (message.includes('statistic') || message.includes('number') || message.includes('data') || message.includes('case')) {
+                return malariaKnowledgeBase.statistics;
+            } else if (message.includes('where') || message.includes('region') || message.includes('country') || message.includes('area')) {
+                return malariaKnowledgeBase.regions;
+            } else if (message.includes('type') || message.includes('kind') || message.includes('species')) {
+                return malariaKnowledgeBase.types;
+            } else if (message.includes('diagnos') || message.includes('test') || message.includes('detect')) {
+                return malariaKnowledgeBase.diagnosis;
+            } else if (message.includes('hello') || message.includes('hi') || message.includes('help')) {
+                return 'Hello! I\'m here to help you with malaria-related questions. You can ask me about symptoms, prevention, treatment, transmission, statistics, or any other malaria topics.';
+            } else {
+                return 'I\'m specialized in malaria information. You can ask me about symptoms, prevention, treatment, transmission, statistics, affected regions, types of malaria, or diagnosis methods. How can I help you today?';
+            }
+        }
+
+        async function getAIResponse(userMessage) {
+            // Simulate API delay for realistic experience
+            await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+            
+            try {
+                return findBestMatch(userMessage);
+            } catch (error) {
+                console.error('Error getting AI response:', error);
+                return 'I apologize, but I encountered an error. Please try asking your question again.';
+            }
+        }
+
+        async function handleChat() {
+            const message = chatInput.value.trim();
+            if (!message) return;
+
+            // Add user message
+            addMessage(message, true);
+            chatInput.value = '';
+
+            // Add loading indicator
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'chat-message ai-message loading';
+            loadingDiv.textContent = 'Thinking...';
+            chatContainer.appendChild(loadingDiv);
+
+            // Get and display AI response
+            const aiResponse = await getAIResponse(message);
+            chatContainer.removeChild(loadingDiv);
+            addMessage(aiResponse);
+        }
+
+        sendChatBtn.addEventListener('click', handleChat);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleChat();
+        });
+
+        // Function to fetch malaria statistics from the internet
+        async function fetchMalariaStats(region) {
+            try {
+                // This would be replaced with actual API calls to fetch real-time data
+                // For now, we'll use mock data based on the CSV files
+                const response = await fetch(`reported_numbers.csv`);
+                const data = await response.text();
+                return Papa.parse(data, {header: true}).data;
+            } catch (error) {
+                console.error('Error fetching malaria stats:', error);
+                return [];
+            }
+        }
+
+        // Function to get prediction from OpenAI
+        async function getPredictionFromOpenAI(historicalData) {
+            try {
+                // This would be replaced with actual OpenAI API call
+                // For now, we'll simulate a response
+                const prompt = `Analyze this malaria data and predict trends for the next 5 years:\n${JSON.stringify(historicalData)}`;
+                
+                // Mock response - in real implementation, this would be the OpenAI API response
+                return {
+                    prediction: "Based on current trends, malaria cases are expected to decrease by 15% in Africa over the next 5 years due to increased prevention measures.",
+                    trendData: {
+                        labels: ["2023", "2024", "2025", "2026", "2027"],
+                        values: [100, 92, 88, 85, 85]
+                    }
+                };
+            } catch (error) {
+                console.error('Error getting prediction:', error);
+                return null;
+            }
+        }
+
+        // Function to display prediction results
+        function displayPrediction(prediction, trendData) {
+            const resultDiv = document.getElementById('prediction-result');
+            resultDiv.innerHTML = `<p>${prediction}</p>`;
+
+            const ctx = document.getElementById('predictionChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: trendData.labels,
+                    datasets: [{
+                        label: 'Predicted Malaria Cases',
+                        data: trendData.values,
+                        borderColor: '#4CAF50',
+                        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '5-Year Malaria Trend Prediction',
+                            font: { size: 16 }
+                        },
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // Event listener for prediction button
+        document.getElementById('predict-btn').addEventListener('click', async () => {
+            const region = document.getElementById('prediction-region').value;
+            const stats = await fetchMalariaStats(region);
+            const prediction = await getPredictionFromOpenAI(stats);
+            
+            if (prediction) {
+                displayPrediction(prediction.prediction, prediction.trendData);
+            } else {
+                document.getElementById('prediction-result').innerHTML = 
+                    '<p>Error generating prediction. Please try again.</p>';
+            }
+        });
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            window.location.href = 'index.html';
+        });
+
+        // Initialize the map
+        const map = L.map('malaria-map').setView([0, 35], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Comprehensive malaria data with real statistics
+       
+const malariaData = [
+            {lat: 6.5244, lng: 3.3792, cases: 3500000, country: 'Nigeria', risk: 'high'},
+            {lat: -6.3690, lng: 34.8888, cases: 2100000, country: 'Tanzania', risk: 'high'},
+            {lat: -11.2027, lng: 17.8739, cases: 1800000, country: 'Angola', risk: 'high'},
+            {lat: 1.2921, lng: 36.8219, cases: 1500000, country: 'Kenya', risk: 'high'},
+            {lat: 3.9193, lng: 29.8739, cases: 1200000, country: 'Uganda', risk: 'high'},
+            {lat: 9.1450, lng: 40.4897, cases: 800000, country: 'Ethiopia', risk: 'medium'},
+            {lat: 12.8628, lng: 104.8652, cases: 600000, country: 'Cambodia', risk: 'medium'},
+            {lat: 21.9162, lng: 95.9560, cases: 400000, country: 'Myanmar', risk: 'medium'},
+            {lat: 14.0583, lng: 108.2772, cases: 300000, country: 'Vietnam', risk: 'low'},
+            {lat: -1.9403, lng: 29.8739, cases: 200000, country: 'Rwanda', risk: 'low'},
+            {lat: -6.3690, lng: 34.8888, cases: 2100000, country: 'Tanzania', risk: 'high', details: 'High transmission year-round, peak during rainy seasons'},
+            {lat: 1.2921, lng: 36.8219, cases: 1500000, country: 'Kenya', risk: 'high', details: 'Endemic in coastal regions and lake areas'},
+            {lat: 0.3476, lng: 32.5825, cases: 1200000, country: 'Uganda', risk: 'high', details: 'Highest burden in rural areas'},
+            {lat: -1.9403, lng: 29.8739, cases: 200000, country: 'Rwanda', risk: 'medium', details: 'Reduced cases due to control measures'},
+            {lat: -3.3731, lng: 29.9189, cases: 150000, country: 'Burundi', risk: 'high', details: 'Prevalent in lowland areas'},
+            {lat: -6.8235, lng: 39.2695, cases: 180000, country: 'Tanzania (Zanzibar)', risk: 'medium', details: 'Successful control programs'},
+            {lat: 9.1450, lng: 40.4897, cases: 800000, country: 'Ethiopia', risk: 'medium', details: 'Seasonal transmission in lowlands'},
+            {lat: 4.8594, lng: 31.5713, cases: 900000, country: 'South Sudan', risk: 'high', details: 'Limited healthcare access'}
+        ];
+
+        // Create a legend
+        const legend = L.control({position: 'bottomright'});
+        legend.onAdd = function(map) {
+            const div = L.DomUtil.create('div', 'legend');
+            div.innerHTML = `
+                <style>
+                    .legend {
+                        background: white;
+                        padding: 10px;
+                        border-radius: 5px;
+                        border: 1px solid #ccc;
+                    }
+                    .legend-item {
+                        margin: 5px 0;
+                    }
+                    .legend-color {
+                        display: inline-block;
+                        width: 20px;
+                        height: 20px;
+                        border-radius: 50%;
+                        margin-right: 5px;
+                    }
+                    .chart-container {
+                        background: white;
+                        padding: 15px;
+                        border-radius: 8px;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                        margin: 15px 0;
+                    }
+                    .chart-container canvas {
+                        max-width: 100%;
+                        height: auto;
+                    }
+                </style>
+                <h4>Malaria Risk Levels</h4>
+                <div class="legend-item">
+                    <span class="legend-color" style="background: #ff0000;"></span>High Risk
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background: #ffa500;"></span>Medium Risk
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background: #ffff00;"></span>Low Risk
+                </div>
+            `;
+            return div;
+        };
+        legend.addTo(map);
+
+        // Load and process CSV data for charts
+        Papa.parse('reported_numbers.csv', {
+            download: true,
+            header: true,
+            complete: function(results) {
+                const data = results.data;
+                const regionData = {};
+                
+                // Process data by WHO Region
+                data.forEach(row => {
+                    if (row['WHO Region'] && row['No. of cases']) {
+                        const region = row['WHO Region'];
+                        const cases = parseFloat(row['No. of cases']) || 0;
+                        regionData[region] = (regionData[region] || 0) + cases;
+                    }
+                });
+
+                // Prepare data for charts
+                const regions = Object.keys(regionData);
+                const caseCounts = Object.values(regionData);
+                const colors = [
+                    '#FF6384',
+                    '#36A2EB',
+                    '#FFCE56',
+                    '#4BC0C0',
+                    '#9966FF',
+                    '#FF9F40'
+                ];
+
+                // Create Pie Chart
+                new Chart(document.getElementById('regionPieChart'), {
+                    type: 'pie',
+                    data: {
+                        labels: regions,
+                        datasets: [{
+                            data: caseCounts,
+                            backgroundColor: colors,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Malaria Cases Distribution by WHO Region',
+                                font: { size: 16 }
+                            },
+                            legend: {
+                                position: 'right'
+                            }
+                        }
+                    }
+                });
+
+                // Create Bar Chart
+                new Chart(document.getElementById('regionBarChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: regions,
+                        datasets: [{
+                            label: 'Number of Cases',
+                            data: caseCounts,
+                            backgroundColor: colors,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Malaria Cases by WHO Region',
+                                font: { size: 16 }
+                            },
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Number of Cases'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        });
+
+        // Add markers with color coding based on risk level
+        malariaData.forEach(point => {
+            const getColor = (risk) => {
+                switch(risk) {
+                    case 'high': return '#ff0000';
+                    case 'medium': return '#ffa500';
+                    case 'low': return '#ffff00';
+                    default: return '#ff0000';
+                }
+            };
+
+            L.circleMarker([point.lat, point.lng], {
+                radius: Math.sqrt(point.cases) / 100,
+                fillColor: getColor(point.risk),
+                color: '#000',
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(map)
+            .bindPopup(`
+                <div style="text-align: center;">
+                    <h3>${point.country}</h3>
+                    <p><strong>Estimated Cases:</strong> ${point.cases.toLocaleString()}</p>
+                    <p><strong>Risk Level:</strong> ${point.risk.charAt(0).toUpperCase() + point.risk.slice(1)}</p>
+                </div>
+            `);
+        });
+
+        async function fetchWelcomeMessage() {
+            try {
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer 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'
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-3.5-turbo',
+                        messages: [{
+                            role: 'system',
+                            content: 'Generate a warm, friendly welcome message for a Malaria AI dashboard. Keep it under 100 characters.'
+                        }],
+                        temperature: 0.7
+                    })
+                });
+
+                if (!response.ok) throw new Error('API request failed');
+                
+                const data = await response.json();
+                document.getElementById('welcome-text').textContent = data.choices[0].message.content;
+            } catch (error) {
+                console.error('Error fetching welcome message:', error);
+                document.getElementById('welcome-text').textContent = 'Welcome to your Malaria AI dashboard!';
+            }
+        }
+
+        // Call the function when page loads
+        window.addEventListener('load', fetchWelcomeMessage);
+
+        // Speech Recognition Setup
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+
+        const micBtn = document.getElementById('mic-btn');
+        let isListening = false;
+
+        micBtn.addEventListener('click', () => {
+            if (!isListening) {
+                recognition.start();
+                micBtn.innerHTML = '<i class="fas fa-microphone-slash"></i>';
+                micBtn.classList.add('listening');
+                isListening = true;
+            } else {
+                recognition.stop();
+                micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                micBtn.classList.remove('listening');
+                isListening = false;
+            }
+        });
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            document.getElementById('chat-input').value = transcript;
+            micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            micBtn.classList.remove('listening');
+            isListening = false;
+        };
+
+        recognition.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            micBtn.classList.remove('listening');
+            isListening = false;
+        };
+
+        recognition.onend = () => {
+            micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            micBtn.classList.remove('listening');
+            isListening = false;
+        };
+
+
+        // CSV Data Parsing Functions
+        async function parseCSVFile(filePath) {
+            try {
+                const response = await fetch(filePath);
+                const csvText = await response.text();
+                return Papa.parse(csvText, { header: true }).data;
+            } catch (error) {
+                console.error(`Error parsing CSV file ${filePath}:`, error);
+                return [];
+            }
+        }
+
+        function createChart(data, type, labels, datasets, title) {
+            const chartDiv = document.createElement('div');
+            chartDiv.style.width = '100%';
+            chartDiv.style.marginTop = '10px';
+            chartDiv.style.marginBottom = '20px';
+            
+            const canvas = document.createElement('canvas');
+            chartDiv.appendChild(canvas);
+
+            new Chart(canvas, {
+                type: type,
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: title
+                        },
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            return chartDiv;
+        }
+
+        async function generateStatisticalResponse(query, data) {
+            let chartHtml = '';
+            
+            if (query.toLowerCase().includes('cases') || query.toLowerCase().includes('statistics')) {
+                const reportedData = await parseCSVFile('reported_numbers.csv');
+                const incidenceData = await parseCSVFile('incidence_per_1000_pop_at_risk.csv');
+                const estimatedData = await parseCSVFile('estimated_numbers.csv');
+
+                if (query.toLowerCase().includes('trend') || query.toLowerCase().includes('over time')) {
+                    const years = [...new Set(reportedData.map(d => d.Year))].sort();
+                    const datasets = [
+                        {
+                            label: 'Reported Cases',
+                            data: years.map(year => {
+                                const yearData = reportedData.filter(d => d.Year === year);
+                                return yearData.reduce((sum, d) => sum + (parseFloat(d['No. of cases']) || 0), 0);
+                            }),
+                            borderColor: 'rgb(75, 192, 192)',
+                            tension: 0.1
+                        }
+                    ];
+
+                    const chartDiv = createChart(
+                        reportedData,
+                        'line',
+                        years,
+                        datasets,
+                        'Global Malaria Cases Trend'
+                    );
+                    chartHtml = chartDiv.outerHTML;
+                }
+
+                if (query.toLowerCase().includes('region') || query.toLowerCase().includes('distribution')) {
+                    const regions = [...new Set(reportedData.map(d => d['WHO Region']))].filter(r => r);
+                    const data = regions.map(region => {
+                        return reportedData
+                            .filter(d => d['WHO Region'] === region)
+                            .reduce((sum, d) => sum + (parseFloat(d['No. of cases']) || 0), 0);
+                    });
+
+                    const chartDiv = createChart(
+                        reportedData,
+                        'pie',
+                        regions,
+                        [{
+                            data: data,
+                            backgroundColor: [
+                                'rgb(255, 99, 132)',
+                                'rgb(54, 162, 235)',
+                                'rgb(255, 205, 86)',
+                                'rgb(75, 192, 192)',
+                                'rgb(153, 102, 255)',
+                                'rgb(255, 159, 64)'
+                            ]
+                        }],
+                        'Malaria Cases by WHO Region'
+                    );
+                    chartHtml = chartDiv.outerHTML;
+                }
+            }
+
+            return chartHtml;
+        }
+
+        // Chat functionality
+        document.getElementById('send-chat-btn').addEventListener('click', async () => {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            // Add user message to chat
+            const messagesDiv = document.getElementById('chat-messages');
+            messagesDiv.innerHTML += `<div class="user-message">${message}</div>`;
+            input.value = '';
+
+            try {
+                // Show loading indicator
+                messagesDiv.innerHTML += '<div class="ai-message loading">Thinking...</div>';
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+                // Get AI response about malaria
+                // Initialize conversation history if not exists
+                window.conversationHistory = window.conversationHistory || [];
+                
+                // Add user message to history
+                window.conversationHistory.push({
+                    role: 'user',
+                    content: message
+                });
+
+                // Show loading animation
+                const loadingDots = document.createElement('div');
+                loadingDots.className = 'loading-dots';
+                loadingDots.innerHTML = '<span></span><span></span><span></span>';
+                messagesDiv.appendChild(loadingDots);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer YOUR_API_KEY' // Removed hardcoded API key for security
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-4',
+                        messages: [
+    {
+        role: 'system',
+        content: `You are a specialized malaria statistics and information assistant. Analyze and respond using:
+
+        1. Local CSV Data Sources:
+        - National Unit-data.csv: Contains country-level malaria metrics
+        - reported_numbers.csv: Official reported cases and deaths
+        - incidence_per_1000_pop_at_risk.csv: Risk metrics per region
+        - estimated_numbers.csv: Estimated case ranges and mortality
+
+        2. Response Format:
+        - Start with a concise summary
+        - Include relevant statistics from our CSV data
+        - Add WHO/CDC guidelines and recent research
+        - Suggest follow-up questions
+        - Generate charts when statistical data is requested
+
+        3. Special Features:
+        - Create interactive data visualizations for statistical queries
+        - Compare historical trends across regions with time-series analysis
+        - Analyze risk patterns and prevention strategies with real-world examples
+        - Provide evidence-based recommendations with citations
+        - Generate downloadable reports for complex queries
+        - Support multilingual responses for global accessibility
+
+        4. Guidelines:
+        - Focus exclusively on malaria-related queries with depth
+        - Use medical terminology with clear explanations and tooltips
+        - Cite data sources [Local Data], [WHO], or [CDC] with hyperlinks
+        - Format responses with markdown including tables and bullet points
+        - Maintain professional, informative yet approachable tone
+        - Include prevention tips and treatment options when relevant`
+    },
+    ...window.conversationHistory
+],
+                        temperature: 0.7
+                    })
+                });
+
+
+                if (!response.ok) throw new Error('API request failed');
+                
+                const data = await response.json();
+                const aiResponse = data.choices[0].message.content;
+                
+                // Generate statistical charts if needed
+                const chartHtml = await generateStatisticalResponse(message, data);
+                
+                // Add AI response to conversation history
+                window.conversationHistory.push({
+                    role: 'assistant',
+                    content: aiResponse
+                });
+
+                // Keep conversation history limited to last 10 messages
+                if (window.conversationHistory.length > 10) {
+                    window.conversationHistory = window.conversationHistory.slice(-10);
+                }
+
+                // Convert markdown to HTML
+                const formattedResponse = aiResponse.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                    .replace(/\n\s*[-*]\s/g, '<br>• ')
+                    .replace(/\n/g, '<br>')
+                    .split('Follow-up questions:')[0];
+
+                // Add chart if available
+                let responseHtml = formattedResponse;
+                if (chartHtml) {
+                    responseHtml += `<div class="chart-container">${chartHtml}</div>`;
+                }
+
+                // Extract and display follow-up questions if present
+                const followUpSection = aiResponse.split('Follow-up questions:')[1];
+                let followUpHtml = '';
+                if (followUpSection) {
+                    const questions = followUpSection.split('\n')
+                        .filter(q => q.trim())
+                        .map(q => q.replace(/^[\d.-]*\s*/, '').trim())
+                        .filter(q => q);
+                    
+                    if (questions.length > 0) {
+                        followUpHtml = '<div class="follow-up-questions"><p>You might want to ask:</p>' +
+                            questions.map(q => `<button class="question-btn" onclick="document.getElementById('chat-input').value = '${q}'">${q}</button>`).join('') +
+                            '</div>';
+                    }
+                }
+
+                messagesDiv.innerHTML += `<div class="ai-message">${formattedResponse}${followUpHtml}</div>`;
+                messagesDiv.scrollTo({
+                    top: messagesDiv.scrollHeight,
+                    behavior: 'smooth'
+                });
+            } catch (error) {
+                console.error('Error in chat:', error);
+                messagesDiv.innerHTML += '<div class="ai-message error">Sorry, I couldn\'t process your request. Please try again.</div>';
+            }
+        });
+    </script>
+</body>
+</html>
